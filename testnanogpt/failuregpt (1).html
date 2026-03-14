@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FailureGPT — Material Failure Analysis</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f1;
+    --surface: #ffffff;
+    --surface2: #f0eeeb;
+    --border: rgba(0,0,0,0.12);
+    --border-med: rgba(0,0,0,0.22);
+    --text: #1a1a18;
+    --text-secondary: #5a5955;
+    --text-tertiary: #8a8880;
+    --accent: #185fa5;
+    --accent-bg: #e6f1fb;
+    --accent-text: #0c447c;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 780px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 14px;
+    border-bottom: 0.5px solid var(--border-med);
+  }
+  .header h1 { font-size: 18px; font-weight: 500; }
+  .badge {
+    font-size: 11px; font-weight: 500;
+    padding: 3px 9px; border-radius: 4px;
+    background: var(--accent-bg); color: var(--accent-text);
+  }
+
+  /* Context row */
+  .context-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .field label {
+    display: block; font-size: 11px;
+    color: var(--text-tertiary); margin-bottom: 4px;
+  }
+  select {
+    width: 100%; padding: 7px 9px; font-size: 13px;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-md);
+    background: var(--surface); color: var(--text);
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a8880' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    padding-right: 28px;
+  }
+
+  /* Quick prompts */
+  .section-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 5px; }
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .quick-btn {
+    font-size: 11px; padding: 4px 11px;
+    border: 0.5px solid var(--border-med);
+    border-radius: 20px; cursor: pointer;
+    background: var(--surface); color: var(--text-secondary);
+    transition: background 0.15s;
+  }
+  .quick-btn:hover { background: var(--surface2); }
+
+  /* Chat window */
+  .chat-window {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface2);
+    min-height: 260px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .msg { display: flex; flex-direction: column; gap: 3px; max-width: 88%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.bot  { align-self: flex-start; align-items: flex-start; }
+  .sender { font-size: 11px; color: var(--text-tertiary); }
+  .bubble {
+    padding: 9px 13px; font-size: 13px; line-height: 1.6;
+    border-radius: 12px; white-space: pre-wrap; word-break: break-word;
+  }
+  .user .bubble {
+    background: var(--accent-bg); color: var(--text);
+    border-bottom-right-radius: 3px;
+  }
+  .bot .bubble {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-bottom-left-radius: 3px;
+  }
+  .thinking { opacity: 0.45; font-style: italic; }
+
+  /* Input row */
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  textarea {
+    flex: 1; padding: 9px 11px; font-size: 13px; line-height: 1.5;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-md);
+    background: var(--surface); color: var(--text);
+    resize: none; height: 72px;
+    font-family: inherit;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .send-btn {
+    padding: 9px 16px; font-size: 13px; font-weight: 500;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-md);
+    background: var(--surface); color: var(--text);
+    cursor: pointer; white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .send-btn:hover { background: var(--surface2); }
+  .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* API key input */
+  .api-row { display: flex; gap: 8px; align-items: center; }
+  .api-row label { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+  .api-row input {
+    flex: 1; padding: 6px 9px; font-size: 12px;
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius-md);
+    background: var(--surface); color: var(--text);
+    font-family: var(--font-mono, monospace);
+  }
+  .api-row input:focus { outline: none; border-color: var(--accent); }
+  .api-note { font-size: 11px; color: var(--text-tertiary); }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --surface: #252523; --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.1); --border-med: rgba(255,255,255,0.18);
+      --text: #e8e6e0; --text-secondary: #a09e99; --text-tertiary: #706e69;
+      --accent-bg: #0c2540; --accent-text: #85b7eb;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>FailureGPT</h1>
+    <span class="badge">Material Failure Analysis</span>
+  </div>
+
+  <!-- API key (client-side mode) -->
+  <div class="api-row">
+    <label>Anthropic API key</label>
+    <input type="password" id="apikey" placeholder="sk-ant-…  (stored in memory only)" />
+  </div>
+  <p class="api-note">Key is never stored to disk. Leave blank if using a local Python proxy on <code>localhost:5000</code>.</p>
+
+  <!-- Context dropdowns -->
+  <div class="context-row">
+    <div class="field">
+      <label>Material class</label>
+      <select id="mat">
+        <option value="">— select —</option>
+        <option>Ferrous metal (steel, cast iron)</option>
+        <option>Non-ferrous metal (Al, Ti, Cu)</option>
+        <option>Polymer</option>
+        <option>Ceramic / glass</option>
+        <option>Composite</option>
+        <option>Unknown</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Loading condition</label>
+      <select id="load">
+        <option value="">— select —</option>
+        <option>Static tensile</option>
+        <option>Cyclic / fatigue</option>
+        <option>Impact</option>
+        <option>Creep (high temp)</option>
+        <option>Wear / friction</option>
+        <option>Unknown</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Environment</label>
+      <select id="env">
+        <option value="">— select —</option>
+        <option>Ambient / dry</option>
+        <option>Aqueous / humid</option>
+        <option>Corrosive media</option>
+        <option>High temperature</option>
+        <option>Cryogenic</option>
+        <option>Unknown</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Quick prompts -->
+  <div>
+    <div class="section-label">Quick prompts</div>
+    <div class="quick-btns">
+      <button class="quick-btn" onclick="fillPrompt('Fractured surface shows beach marks and ratchet marks. What failure mode is this?')">Beach marks observed</button>
+      <button class="quick-btn" onclick="fillPrompt('Component failed below yield strength. Fracture surface is flat and granular. What tests should I run?')">Below-yield fracture</button>
+      <button class="quick-btn" onclick="fillPrompt('Pitting and cracking near a weld HAZ. What are the likely causes?')">Weld zone cracking</button>
+      <button class="quick-btn" onclick="fillPrompt('What ASTM standards apply to fatigue failure analysis?')">ASTM fatigue standards</button>
+      <button class="quick-btn" onclick="fillPrompt('Describe the key fractographic differences between ductile and brittle fracture.')">Ductile vs brittle</button>
+      <button class="quick-btn" onclick="fillPrompt('Component shows corrosion product on fracture surface. Could this be stress corrosion cracking?')">SCC diagnosis</button>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-window" id="chat">
+    <div class="msg bot">
+      <span class="sender">FailureGPT</span>
+      <div class="bubble">Describe the failure: fracture surface appearance, service conditions, geometry, or observed symptoms. Set context dropdowns above for more targeted analysis.</div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-row">
+    <textarea id="inp" placeholder="e.g. Stainless steel shaft broke after 6 months. Fracture surface shows radial marks from a single origin…"></textarea>
+    <button class="send-btn" id="sendbtn" onclick="send()">Analyze ↗</button>
+  </div>
+
+</div>
+
+<script>
+const SYSTEM = `You are FailureGPT, an expert material failure analysis assistant for mechanical and materials engineers. You have deep knowledge of:
+- Failure modes: fatigue, stress corrosion cracking (SCC), corrosion, creep, brittle/ductile fracture, wear, hydrogen embrittlement, fretting, erosion
+- Fractography: interpreting beach marks, ratchet marks, chevron patterns, dimple rupture, cleavage facets, striations, oxidation coloration
+- Relevant standards: ASTM E2332, E399, E647, E8/E8M, E23, ASM Handbook Vol. 11 (Failure Analysis and Prevention)
+- Diagnostic tests: SEM/EDS, optical metallography, hardness profiling, chemical analysis, residual stress measurement (XRD), EBSD, Charpy/Izod impact
+
+When analyzing, always structure your response as:
+1. Most likely failure mode — with fractographic or mechanistic reasoning
+2. Alternative hypotheses (2–3) — briefly stated
+3. Recommended diagnostic tests — ranked by priority
+4. Relevant standards or ASM Handbook references
+5. Engineering recommendations (design, material, process changes)
+
+Be precise and use correct engineering terminology. Keep responses concise.`;
+
+let history = [];
+
+function buildContextNote() {
+  const mat  = document.getElementById('mat').value;
+  const load = document.getElementById('load').value;
+  const env  = document.getElementById('env').value;
+  const parts = [];
+  if (mat)  parts.push('Material: ' + mat);
+  if (load) parts.push('Loading: ' + load);
+  if (env)  parts.push('Environment: ' + env);
+  return parts.length ? '[Engineer-provided context — ' + parts.join(' | ') + ']\n\n' : '';
+}
+
+function fillPrompt(text) {
+  document.getElementById('inp').value = text;
+  document.getElementById('inp').focus();
+}
+
+function addMsg(role, text) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  const sender = document.createElement('span');
+  sender.className = 'sender';
+  sender.textContent = role === 'user' ? 'You' : 'FailureGPT';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  div.appendChild(sender);
+  div.appendChild(bubble);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return bubble;
+}
+
+async function send() {
+  const inp    = document.getElementById('inp');
+  const btn    = document.getElementById('sendbtn');
+  const apiKey = document.getElementById('apikey').value.trim();
+  const userText = inp.value.trim();
+  if (!userText) return;
+
+  const fullMsg = buildContextNote() + userText;
+  addMsg('user', userText);
+  inp.value = '';
+  btn.disabled = true;
+
+  history.push({ role: 'user', content: fullMsg });
+
+  const thinkBubble = addMsg('bot', 'Analyzing…');
+  thinkBubble.classList.add('thinking');
+
+  try {
+    let reply;
+
+    if (apiKey) {
+      // Direct Anthropic API call
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-calls': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1024,
+          system: SYSTEM,
+          messages: history
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      reply = data.content.map(b => b.text || '').join('');
+    } else {
+      // Proxy mode — expects local Python server at /chat
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: SYSTEM, messages: history })
+      });
+      const data = await res.json();
+      reply = data.content.map(b => b.text || '').join('');
+    }
+
+    thinkBubble.classList.remove('thinking');
+    thinkBubble.textContent = reply;
+    history.push({ role: 'assistant', content: reply });
+
+  } catch (e) {
+    thinkBubble.classList.remove('thinking');
+    thinkBubble.textContent = 'Error: ' + e.message;
+  }
+
+  btn.disabled = false;
+  document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+}
+
+document.getElementById('inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+</script>
+</body>
+</html>
