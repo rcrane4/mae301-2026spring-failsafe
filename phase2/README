@@ -14,8 +14,8 @@ Problem Statement
 
 Laser Powder Bed Fusion (LPBF) is an additive manufacturing process used to produce high-performance Ti-6Al-4V components for aerospace applications. Two critical defect types arise from process parameter variations:
 
-- **Lack-of-fusion porosity** — occurs when laser energy is insufficient to fully melt adjacent powder layers, producing irregular elongated pores at melt pool boundaries
-- **Keyhole porosity** — occurs when laser energy is excessive, causing vapor cavity collapse and leaving spherical pores within the melt pool
+- Lack-of-fusion porosity — occurs when laser energy is insufficient to fully melt adjacent powder layers, producing irregular elongated pores at melt pool boundaries
+- Keyhole porosity — occurs when laser energy is excessive, causing vapor cavity collapse and leaving spherical pores within the melt pool
 
 Both defect types act as fatigue crack initiation sites. Current detection methods require SEM imaging followed by manual expert analysis — a process that is slow, subjective, and expensive. Existing simulation tools cannot reliably predict defect formation from first principles, and current GPT-style models are not specialized for fractographic feature interpretation.
 
