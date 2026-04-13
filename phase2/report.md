@@ -1,7 +1,12 @@
-We have a link to an initial MVP web interface here where you can upload an SEM image of TI64 titanium via SegFormer, trained on a Ti64 dataset
+Objective and current MVP definition, What has been built so far, and technical approach: Product that takes in SEM images of Ti64, an alloy used in aircraft engines and race car components, where safety is critical and failure can be catastrophic, so identifying defects in manufacturing is extremely important.
+The current MVP makes it so you can upload an SEM image of TI64 titanium via SegFormer, trained on a Ti64 dataset
 of images and defect masks, and it will identify the defects and provide information and advice through a Claude server: 
 
 https://huggingface.co/spaces/rcrane4/FailSafe
+
+Current limitations: The dataset we trained the model on was originally 16bit, but the website (Gradio) we are using for an interface can only take in 8bit, so we had to convert the 16bit dataset to 8bit. Therefore the model is trained on 8bit images, so images must be converted to 8bit by the user before being uploaded for it to work.
+
+Plan for phase 3: Fix the 8bit image issue, and make further optimizations to the current MVP for a more intuitive UI and more precise model training.
 
 We have also provided all files used to train the model and the image dataset used, uploaded to the GitHub in /testnanogpt/
 ..
