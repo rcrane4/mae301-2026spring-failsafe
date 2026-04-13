@@ -4,7 +4,12 @@ of images and defect masks, and it will identify the defects and provide informa
 
 https://huggingface.co/spaces/rcrane4/FailSafe
 
+<img width="596" height="459" alt="image" src="https://github.com/user-attachments/assets/df685236-1ca5-44bd-a0a2-c86b9585d621" />
+
+
 <img width="762" height="482" alt="image" src="https://github.com/user-attachments/assets/5f81d90b-e1d9-4352-80ef-6c2611d402e8" />
+
+<img width="974" height="867" alt="Screenshot 2026-03-30 222037" src="https://github.com/user-attachments/assets/fdd45d74-a37d-42ea-9aec-4f13cfb996fc" />
 
 Current limitations: The dataset we trained the model on was originally 16bit, but the website (Gradio) we are using for an interface can only take in 8bit, so we had to convert the 16bit dataset to 8bit. Therefore the model is trained on 8bit images, so images must be converted to 8bit by the user before being uploaded for it to work.
 
