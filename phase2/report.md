@@ -48,10 +48,13 @@ RECOMMENDATIONS
   6. For future builds, establish baseline defect maps by fractography or CT scanning of witness coupons from the same build platform location; correlate defects with LPBF machine log data (laser power, spot position, thermal signatures) to identify and correct process drift.
   7. If fatigue-critical application, perform conservative S–N testing on this material lot at stress levels 40–50% lower than assumed design strength until defect-conditional fatigue data is established.
 ============================================================"
+___________________________________________________________________
 
 Current limitations: The dataset we trained the model on was originally 16bit, but the website (Gradio) we are using for an interface can only take in 8bit, so we had to convert the 16bit dataset to 8bit. Therefore the model is trained on 8bit images, so images must be converted to 8bit by the user before being uploaded for it to work.
 
 Plan for phase 3: Fix the 8bit image issue, and make further optimizations to the current MVP for a more intuitive UI and more precise model training.
+
+_______________________________________________________________________
 
 We have also provided all files used to train the model and the image dataset used, uploaded to the GitHub in /testnanogpt/
 ..
