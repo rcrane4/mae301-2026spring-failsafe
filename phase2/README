@@ -1,0 +1,309 @@
+FAILSAFE
+> Built with SegFormer + Claude · OSF Ti-64 Dataset
+
+---
+
+Overview
+
+FailSafe is an end-to-end failure analysis pipeline for additively manufactured aerospace components. It takes a Scanning Electron Microscope (SEM) fractograph as input and returns a structured engineering diagnosis — defect segmentation, morphological feature extraction, defect type classification, crack initiation risk assessment, and natural language recommendations — without requiring expert fractography knowledge.
+
+The system was motivated by a real gap in engineering practice: fractographic analysis of LPBF (Laser Powder Bed Fusion) components is slow, expert-dependent, and not scalable to production inspection workflows. FailureGPT addresses this by combining a fine-tuned vision model for pixel-level defect detection with a large language model for engineering reasoning.
+
+---
+
+Problem Statement
+
+Laser Powder Bed Fusion (LPBF) is an additive manufacturing process used to produce high-performance Ti-6Al-4V components for aerospace applications. Two critical defect types arise from process parameter variations:
+
+- **Lack-of-fusion porosity** — occurs when laser energy is insufficient to fully melt adjacent powder layers, producing irregular elongated pores at melt pool boundaries
+- **Keyhole porosity** — occurs when laser energy is excessive, causing vapor cavity collapse and leaving spherical pores within the melt pool
+
+Both defect types act as fatigue crack initiation sites. Current detection methods require SEM imaging followed by manual expert analysis — a process that is slow, subjective, and expensive. Existing simulation tools cannot reliably predict defect formation from first principles, and current GPT-style models are not specialized for fractographic feature interpretation.
+
+---
+
+Solution Architecture
+
+The pipeline has four layers:
+
+```
+SEM Image (8-bit PNG)
+        ↓
+┌─────────────────────────────┐
+│  Layer 1: Segmentation      │  SegFormer-b0 fine-tuned on OSF Ti-64
+│  pixel → defect/background  │  Outputs binary mask at 256×256
+└─────────────────────────────┘
+        ↓
+┌─────────────────────────────┐
+│  Layer 2: Feature Extraction│  Connected components analysis
+│  mask → morphological stats │  Area, aspect ratio, spatial distribution
+└─────────────────────────────┘
+        ↓
+┌─────────────────────────────┐
+│  Layer 3: Classification    │  Rule-based classifier
+│  features → defect type     │  Lack-of-fusion vs keyhole vs mixed
+└─────────────────────────────┘
+        ↓
+┌─────────────────────────────┐
+│  Layer 4: Diagnosis         │  Claude (claude-sonnet-4-20250514)
+│  features → engineering     │  Risk level, mechanism, recommendations
+│  diagnosis                  │
+└─────────────────────────────┘
+```
+
+---
+
+Dataset
+
+Source: OSF Materials Data Segmentation Benchmark  
+URL: https://osf.io/gdwyb/  
+Material: Ti-6Al-4V (Grade 5 titanium alloy), LPBF printed test bars  
+Specimen type: Four-point bend test bars, fractured to failure  
+Imaging: Scanning Electron Microscope (SEM), ex-situ analysis
+
+The dataset contains three sub-datasets:
+
+| Subset | Defect Type | Images | Masks |
+|---|---|---|---|
+| `lack_of_fusion` | Lack-of-fusion pores | 100 | 100 pixel-level |
+| `keyhole` | Keyhole pores | 100 | 100 pixel-level |
+| `all_defects` | Both types combined | 100 | 100 pixel-level |
+
+Masks are binary (0 = background, 255 = defect). Images are 1024×1024 pixels, originally 16-bit grayscale. For training and inference compatibility with standard tooling, all images were converted to 8-bit PNG using per-image min-max normalization.
+
+Class imbalance: Defect pixels represent approximately 1–8% of each image. This required specialized loss functions to prevent the model from collapsing to all-background predictions.
+
+---
+
+Model: SegFormer-b0
+
+Architecture* SegFormer (Xie et al., 2021) with Mix Transformer encoder (MiT-B0)  
+Pretrained weights: `nvidia/mit-b0` (ImageNet)  
+Task: Binary semantic segmentation (background vs. defect)  
+Input size: 256×256 pixels (RGB, 3-channel grayscale)  
+Output: Binary mask at 256×256
+
+SegFormer was chosen over UNet because:
+- Hierarchical transformer encoder captures multi-scale features critical for fractography
+- Efficient attention mechanism makes it viable on CPU
+- Prior literature (ScienceDirect, 2024) demonstrated SegFormer outperforming UNet and DeepLabV3+ on fractographic SEM segmentation with mIoU of 0.597
+
+Training Details
+
+| Parameter | Value |
+|---|---|
+| Optimizer | AdamW |
+| Encoder LR | 6e-5 |
+| Decode head LR | 3e-3 (50× encoder) |
+| Epochs | 15 |
+| Batch size | 2 |
+| Image size | 256×256 |
+| Train/val split | 80/20 |
+| Device | CPU |
+
+Loss function: Combined Dice loss + weighted cross-entropy
+- Dice loss directly optimizes region overlap — critical for sparse defect classes
+- Cross-entropy weight: defect class weighted 4× to penalize missed detections
+- Formula: `loss = 0.5 * CE(weight=[1, 4]) + 0.5 * Dice`
+
+Key training challenge — class imbalance:
+With defect pixels at 1–8% of each image, a naive cross-entropy loss causes the model to predict all-background and achieve spuriously high accuracy (~94%). This was diagnosed by checking that `val_mIoU` was frozen across epochs, and fixed by introducing Dice loss and per-class weighting. Additionally, a differential learning rate (50× higher for the randomly-initialized decode head vs. the pretrained encoder) was required to ensure the classification head updated meaningfully.
+
+Results
+
+| Subset | Best val mIoU |
+|---|---|
+| lack_of_fusion | 0.613 |
+| keyhole | 0.619 |
+| all_defects | 0.603 |
+
+These results are consistent with the published SegFormer fractography benchmark (mIoU 0.597, ScienceDirect 2024), achieved with 80 training images on CPU in a 6-week project.
+
+---
+
+Feature Extraction
+
+After segmentation, morphological features are extracted from the binary mask using a custom pure-Python connected components implementation:
+
+| Feature | Description | Engineering Significance |
+|---|---|---|
+| `defect_area_fraction` | % of fracture surface that is defect | Aerospace acceptance threshold typically <1% |
+| `defect_count` | Number of distinct pore regions | Many small pores = LoF; few large = keyhole |
+| `mean_pore_area_px` | Mean area per blob (px²) | Larger pores = higher stress concentration |
+| `max_pore_area_px` | Largest single pore | Critical flaw size for fracture mechanics |
+| `mean_aspect_ratio` | Mean major/minor axis ratio per blob | ~1.0 = circular (keyhole); >2.0 = elongated (LoF) |
+| `spatial_concentration` | Std of centroid distances from center | High = clustered defects = localized weak zone |
+| `size_std` | Std of pore areas | High = heterogeneous process conditions |
+| `quadrant_distribution` | Defect fraction per image quadrant | Identifies spatially concentrated risk regions |
+
+Rule-based defect classifier:
+```
+if defect_area < 0.002%:          → clean
+if mean_AR ≤ 1.6 and count < 20:  → keyhole_porosity
+if mean_AR > 1.6 and count ≥ 20:  → lack_of_fusion
+else:                              → mixed
+```
+
+---
+
+Generative Reasoning Layer
+
+The Claude API (`claude-sonnet-4-20250514`) receives the extracted feature dict as structured context along with material and process metadata, and returns a JSON-structured engineering diagnosis:
+
+Input context provided to Claude:
+- Material: Ti-6Al-4V LPBF
+- All quantitative morphological features
+- Rule-based defect type classification
+
+Output fields:
+- `diagnosis_summary` — 2-3 sentence plain English summary
+- `defect_interpretation` — detailed feature interpretation
+- `crack_initiation_risk` — low / medium / high / critical
+- `risk_rationale` — quantitative justification
+- `dominant_failure_mechanism` — specific defect type
+- `critical_regions` — which quadrants pose highest risk
+- `recommendations` — specific LPBF process corrections
+- `confidence` — low / medium / high
+
+This layer adds unique value over the segmentation model alone: it connects pixel-level measurements to fracture mechanics principles, LPBF process physics, and actionable engineering decisions — knowledge that cannot be encoded in simple rule-based heuristics.
+
+---
+
+File Structure
+
+```
+FractureAnalysis/
+├── app.py              Gradio web interface
+├── dataset.py          PyTorch Dataset class for OSF Ti-64
+├── diagnose.py         Claude API reasoning layer
+├── download_osf.py     OSF dataset downloader
+├── features.py         Feature extraction + classification
+├── inference.py        Visualization of trained model predictions
+├── inspect_dataset.py  Dataset inspection and mask format verification
+├── setup.py            Dependency installer
+├── train.py            SegFormer fine-tuning
+├── requirements.txt    HuggingFace Spaces dependencies
+├── data/
+│   ├── all_defects/
+│   │   ├── images/         Original 16-bit SEM images
+│   │   ├── images_8bit/    8-bit converted (used for training/inference)
+│   │   └── masks/          Binary segmentation masks
+│   ├── lack_of_fusion/
+│   └── keyhole/
+├── checkpoints/
+│   ├── all_defects/best_model.pt
+│   ├── lack_of_fusion/best_model.pt
+│   └── keyhole/best_model.pt
+└── output/
+    ├── inference/      Segmentation visualization grids
+    ├── features/       Feature extraction visualizations + JSON
+    └── diagnosis/      Full pipeline output PNGs + JSONs
+```
+
+---
+
+Setup and Usage
+
+#Local Setup
+
+```bash1. Install dependencies
+python setup.py
+
+2. Download dataset
+python download_osf.py
+If automatic download fails, manually download from https://osf.io/gdwyb/
+Extract into data/<subset>/images/ and data/<subset>/masks/
+
+3. Convert to 8-bit
+python -c "
+import numpy as np
+from PIL import Image
+from pathlib import Path
+for subset in ['all_defects', 'lack_of_fusion', 'keyhole']:
+    for folder in ['images', 'masks']:
+        src = Path(f'data/{subset}/{folder}')
+        dst = Path(f'data/{subset}/{folder}_8bit')
+        dst.mkdir(exist_ok=True)
+        for p in src.glob('*.png'):
+            arr = np.array(Image.open(p), dtype=np.float32)
+            if folder == 'images':
+                arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
+                Image.fromarray((arr * 255).astype(np.uint8)).save(dst / p.name)
+            else:
+                Image.open(p).save(dst / p.name)
+"
+
+4. Inspect dataset
+python inspect_dataset.py
+
+5. Train
+python train.py --epochs 15
+
+6. Run inference
+python inference.py --subset all
+
+7. Launch app (set API key first)
+export ANTHROPIC_API_KEY=sk-ant-...        # Mac/Linux
+$env:ANTHROPIC_API_KEY = "sk-ant-..."     # Windows PowerShell
+python app.py
+```
+
+Image Requirements
+
+- Format: **8-bit PNG only** (16-bit TIFs not supported via Gradio upload)
+- Content: SEM fractograph of metallic LPBF specimen
+- The model was trained on Ti-6Al-4V but may generalize to other metals
+
+---
+
+Technical Decisions and Tradeoffs
+
+Why SegFormer over UNet?
+Published benchmarks show SegFormer outperforms UNet on fractography SEM specifically because multi-scale attention captures both fine crack features and global fracture surface context simultaneously.
+
+Why CPU training?
+No GPU was available. Training 15 epochs × 3 subsets on CPU takes ~2 hours total, which is acceptable for this dataset size (80 training images per subset).
+
+Why 8-bit images?
+Original SEM images are 16-bit (pixel range 1328–65535). Gradio's image upload component cannot handle 16-bit PNGs — it converts them to all-white. Converting training data to 8-bit and retraining produced identical mIoU (0.60–0.62) with full Gradio compatibility.
+
+Why Claude for the reasoning layer?
+Rule-based classifiers using morphological features alone cannot reliably distinguish defect types when aspect ratios cluster in ambiguous ranges (1.3–1.6). Claude receives the full feature context and applies materials science knowledge to provide nuanced interpretation that adapts to each image's specific measurements, rather than applying rigid thresholds.
+
+---
+
+Limitations
+
+- Trained on 80 images per subset — small dataset for a deep learning model
+- 8-bit input only via the web interface
+- Connected components implementation is pure Python (slow for large masks; acceptable at 256×256)
+- Rule-based defect classifier has limited accuracy when aspect ratios are ambiguous
+- Model was trained on LPBF Ti-6Al-4V specifically — generalization to other materials or processes is untested
+- Claude API calls add ~3-5 seconds latency per diagnosis
+
+---
+
+Future Work
+
+- Add smartFRACS dataset for fatigue striation and crack propagation features
+- Fine-tune on GPU with larger image size (512×512) for higher mIoU
+- Replace rule-based classifier with a trained MLP on extracted features
+- Add crack propagation direction prediction using gradient analysis of defect clusters
+- Support 16-bit TIF upload via server-side preprocessing
+- Extend to other aerospace alloys (IN718, Al 7075)
+
+---
+
+References
+
+- Xie et al. (2021). SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers. NeurIPS.
+- Deep learning-based semantic segmentation for morphological fractography. ScienceDirect, 2024.
+- OSF Materials Data Segmentation Benchmark. https://osf.io/eb9jv/
+- Tsopanidis & Osovski. Toward quantitative fractography using convolutional neural networks. arXiv:1908.02242.
+- smartFRACS material fracturing dataset. HuggingFace, 2024.
+
+---
+
+## Authors
+
+Cole · Ian · Skyler · Ryan  · Hannah
