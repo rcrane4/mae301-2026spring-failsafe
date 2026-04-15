@@ -57,3 +57,6 @@ Plan for phase 3: Fix the 8bit image issue, and make further optimizations to th
 _______________________________________________________________________
 
 We have also provided all files used to train the model and the image dataset used, uploaded to the GitHub in /testnanogpt/
+
+
+More in depth information in /phase2/README
