@@ -12,7 +12,7 @@ The persona for this MVP is a process or quality engineer at an aerospace manufa
 **3\. System Design: High-level architecture diagram (can be ASCII or image**  
 **in repo); where the model sits, how data flows through.**
 
-![][image1]
+<img width="368" height="879" alt="Screenshot 2026-04-25 125025" src="https://github.com/user-attachments/assets/703ac352-86e7-41a6-92d7-4837abf5a776" />
 
 The vision model handles perception and Claude handles the engineering reasoning. The rule-based classifier bridges these and gives Claude a structured classification as context instead of raw pixels.  
 **4\. Data: Source(s), size, cleaning, splits.**
