@@ -1,5 +1,4 @@
 **MVP Report**  
-**Place in /mvp/report.md.**
 
 **1\. Executive Summary: Problem, solution, and what your MVP actually does.**
 
