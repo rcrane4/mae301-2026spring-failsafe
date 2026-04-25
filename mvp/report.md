@@ -9,29 +9,10 @@ Fractographic analysis of LPBF (Laser Powder Bed Fusion) aerospace components cu
 
 The persona for this MVP is a process or quality engineer at an aerospace manufacturer producing LPBF Ti-6Al-4V components who needs to assess fractured specimens but lacks a dedicated fractography expert on staff. After a four-point bend test the bar fractures, the engineer images the fracture surface with an SEM and exports an 8-bit PNG. They upload it to FailSafe which returns in ~30 seconds:  segmented defect map, quantitative pore statistics (count, area fraction, aspect ratio, spatial distribution), a defect type classification, a risk level (low/medium/high/critical), and specific recommendations – e.g., “reduce laser power by _% to eliminate keyhole porosity in the 3rd quadrant.” The engineer can act on this without waiting days for an expert to review the SEM image.
 
-
-
-
-<img width="368" height="879" alt="Screenshot 2026-04-25 125025" src="https://github.com/user-attachments/assets/10e92851-40cb-43b3-8a4a-ffb1b0b14bc1" />
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 3. System Design: High-level architecture diagram (can be ASCII or image
 in repo); where the model sits, how data flows through.
 
+<img width="368" height="879" alt="Screenshot 2026-04-25 125025" src="https://github.com/user-attachments/assets/b3c8c7a4-571b-46e9-a669-493462e6b45a" />
 
 
 The vision model handles perception and Claude handles the engineering reasoning. The rule-based classifier bridges these and gives Claude a structured classification as context instead of raw pixels.
