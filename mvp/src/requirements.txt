@@ -1,0 +1,9 @@
+torch
+torchvision
+transformers
+gradio
+anthropic
+Pillow
+numpy
+matplotlib
+accelerate
