@@ -106,6 +106,8 @@ python app.py
 
 Then open **http://localhost:7860** in your browser.
 
+**OR JUST OPEN** https://huggingface.co/spaces/rcrane4/FailSafe
+
 Upload any 8-bit PNG SEM fractograph and the pipeline will return:
 - Segmented defect mask
 - Morphological feature stats
