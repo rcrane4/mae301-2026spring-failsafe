@@ -3,6 +3,7 @@
 > End-to-end failure analysis for LPBF aerospace components · SegFormer + Claude · OSF Ti-64 Dataset
 
 To use FailSafe without reproducing it yourself, click on this link and upload your own 8-bit SEM fractograph:
+
 **Live demo:** https://huggingface.co/spaces/rcrane4/FailSafe
 
 ---
